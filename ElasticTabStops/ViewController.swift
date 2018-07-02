@@ -47,32 +47,16 @@ hello
 five
 """
 
-extension String {
-    func split(separator: (Character) -> Bool) -> [NSRange] {
-        var result: [NSRange] = []
-        var start = startIndex
-        let end = endIndex
-        while start < end {
-            let i = self[start...].index(where: separator) ?? end
-            let range = NSRange((start..<i) as Range<Index>, in: self)
-            result.append(range)
-            start = i == end ? end : index(after: i)
-        }
-        return result
+extension StringProtocol {
+    var tabs: Int {
+        return filter { $0 == "\t" }.count
     }
-}
-
-extension NSAttributedString {
-    var lines: [NSRange] {
-        return string.split(separator: { $0 == "\n" })
+    var lines: [SubSequence] {
+        return split(omittingEmptySubsequences: false) { $0 == "\n" }
     }
     
-    func tabs(in range: NSRange) -> Int {
-        return (string as NSString).substring(with: range).filter { $0 == "\t" }.count
-    }
-    
-    func cells(in range: NSRange) -> [NSRange] {
-        return String(string[Range(range, in: string)!]).split { $0 == "\t" }.map { NSMakeRange($0.location + range.location, $0.length)}
+    var cells: [SubSequence] {
+        return split(omittingEmptySubsequences: false) { $0 == "\t" }
     }
 }
 
@@ -97,8 +81,8 @@ extension Array where Element: Numeric {
 }
 
 extension NSAttributedString {
-    var range: NSRange {
-        return NSMakeRange(0, string.count)
+    func range(for substring: Substring) -> NSRange {
+        return NSRange(substring.startIndex..<substring.endIndex, in: string)
     }
 }
 
@@ -114,13 +98,13 @@ extension Sequence {
 
 extension NSAttributedString {
     func elastic(prefixTabStopWidth: CGFloat = 20, minSpacing: CGFloat = 5) -> [(NSRange, NSParagraphStyle)] {
-        let lines = self.lines
+        let lines = string.lines
         let widths = lines.map { line in
-            cells(in: line).dropLast().map { attributedSubstring(from: $0).size().width }
+            line.cells.dropLast().map { attributedSubstring(from: range(for: $0)).size().width }
     	}
 
         let tabStops: [[CGFloat]] = lines.indices.mapWithLast { previous, i in
-            let tabs = self.tabs(in: lines[i])
+            let tabs = lines[i].tabs
             var stops = previous ?? []
             
             // No tab stop means a "reset" of the column
@@ -138,7 +122,7 @@ extension NSAttributedString {
             return stops
         }
 
-        return Array(zip(lines, tabStops.map { t in
+        return Array(zip(lines.map(range), tabStops.map { t in
             let paragraphStyle = NSMutableParagraphStyle()
             paragraphStyle.tabStops = t.map { max($0 + minSpacing, prefixTabStopWidth) }.accumulate().map {
                 return NSTextTab(textAlignment: .left, location: $0)
@@ -163,10 +147,8 @@ class ViewController: NSViewController, NSTextViewDelegate {
     }
     
     func textDidChange(_ notification: Notification) {
-        textView.textStorage?.removeAttribute(.paragraphStyle, range: textView.attributedString().range)
         for (range, style) in textView.attributedString().elastic() {
             textView.textStorage!.setAttributes([.paragraphStyle: style], range: range)
         }
     }
 }
-
