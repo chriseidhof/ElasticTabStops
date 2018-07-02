@@ -147,8 +147,9 @@ class ViewController: NSViewController, NSTextViewDelegate {
     }
     
     func textDidChange(_ notification: Notification) {
+        textView.textStorage?.removeAttribute(.paragraphStyle, range: NSMakeRange(0, (textView.string as NSString).length))
         for (range, style) in textView.attributedString().elastic() {
-            textView.textStorage!.setAttributes([.paragraphStyle: style], range: range)
+            textView.textStorage!.addAttributes([.paragraphStyle: style], range: range)
         }
     }
 }
